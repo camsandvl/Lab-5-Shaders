@@ -1,0 +1,8 @@
+[package]
+name = "solar_system_shaders"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+image = "0.25"
+minifb = "0.27"
