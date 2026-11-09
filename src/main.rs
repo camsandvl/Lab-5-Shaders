@@ -3,8 +3,10 @@ mod renderer;
 mod shader;
 
 use minifb::{Key, KeyRepeat, Window, WindowOptions};
-use renderer::{render_shader, render_shader_with_saturn_rings, FrameBuffer};
-use shader::{CelestialShader, Planet};
+use renderer::{
+    render_shader, render_shader_with_moon, render_shader_with_saturn_rings, FrameBuffer,
+};
+use shader::{CelestialShader, MoonShader, Planet};
 use std::{env, fs};
 
 const WIDTH: usize = 800;
@@ -67,7 +69,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn render_planet(frame: &mut FrameBuffer, planet: Planet) {
     let shader = CelestialShader::new(planet);
-    if planet.is_saturn() {
+    if planet == Planet::Earth {
+        render_shader_with_moon(frame, &shader, &MoonShader);
+    } else if planet.is_saturn() {
         render_shader_with_saturn_rings(frame, &shader);
     } else {
         render_shader(frame, &shader);

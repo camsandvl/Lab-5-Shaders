@@ -1,4 +1,4 @@
-//! Procedural shaders for the six selected bodies.
+//! Procedural shaders for the six selected bodies and Earth's moon.
 //!
 //! None of these shaders reads an image. Every visible detail is generated
 //! from the surface sample and mathematical functions.
@@ -120,6 +120,37 @@ impl Shader for CelestialShader {
             Planet::Saturn => shade_saturn(sample),
             Planet::Uranus => shade_uranus(sample),
         }
+    }
+}
+
+/// Moon: a procedural gray surface with maria, crater fields and a cold rim.
+/// It is rendered as a second sphere beside the Earth; it does not use a
+/// texture or material.
+pub struct MoonShader;
+
+impl Shader for MoonShader {
+    fn shade(&self, sample: SurfaceSample) -> Vec3 {
+        let position = sample.position;
+
+        // Layer 1: a cool gray base gradient.
+        let base = Vec3::new(0.20, 0.22, 0.25).lerp(
+            Vec3::new(0.66, 0.68, 0.72),
+            (sample.latitude * 0.65 + 0.18).clamp(0.0, 1.0),
+        );
+
+        // Layer 2: broad maria generated from low-frequency waves.
+        let maria_signal = procedural_noise(position * 2.4 + Vec3::new(2.0, 0.0, 4.0));
+        let maria_mask = smoothstep(0.46, 0.66, maria_signal);
+        let with_maria = base.lerp(Vec3::new(0.10, 0.12, 0.15), maria_mask * 0.48);
+
+        // Layer 3: crater-like surface variation at a smaller scale.
+        let crater_signal = procedural_noise(position * 7.0 + Vec3::new(5.0, 1.0, 3.0));
+        let crater_mask = smoothstep(0.58, 0.80, crater_signal);
+        let with_craters = with_maria.lerp(Vec3::new(0.78, 0.80, 0.84), crater_mask * 0.28);
+
+        // Layer 4: diffuse lighting and a subtle atmospheric-looking rim.
+        let lit = apply_diffuse(with_craters, sample, 0.22);
+        lit + Vec3::new(0.34, 0.42, 0.58) * sample.rim.powf(2.8) * 0.16
     }
 }
 

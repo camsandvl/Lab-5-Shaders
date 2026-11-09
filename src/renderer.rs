@@ -74,10 +74,28 @@ fn write_depth_tested(frame: &mut FrameBuffer, x: usize, y: usize, depth: f32, c
 pub fn render_shader(frame: &mut FrameBuffer, shader: &dyn Shader) {
     frame.clear(Vec3::new(0.008, 0.012, 0.035));
 
+    render_shader_object(frame, shader, Vec3::ZERO, 1.0);
+}
+
+/// Renders a sphere and a smaller procedural moon in front of it.
+pub fn render_shader_with_moon(
+    frame: &mut FrameBuffer,
+    shader: &dyn Shader,
+    moon_shader: &dyn Shader,
+) {
+    render_shader(frame, shader);
+
+    // The moon is a second sphere, placed slightly toward the camera so that
+    // the depth buffer also handles the occasional overlap with the Earth.
+    let moon_center = Vec3::new(-1.03, 0.55, 0.85);
+    render_shader_object(frame, moon_shader, moon_center, 0.25);
+}
+
+fn render_shader_object(frame: &mut FrameBuffer, shader: &dyn Shader, center: Vec3, radius: f32) {
     for y in 0..frame.height {
         for x in 0..frame.width {
             let ray = ray_for_pixel(frame, x, y);
-            let Some((surface_point, normal)) = intersect_unit_sphere(ray) else {
+            let Some((surface_point, normal)) = intersect_sphere(ray, center, radius) else {
                 continue;
             };
 
@@ -89,7 +107,10 @@ pub fn render_shader(frame: &mut FrameBuffer, shader: &dyn Shader) {
             let longitude = normal.x.atan2(normal.z) / (std::f32::consts::TAU) + 0.5;
 
             let sample = SurfaceSample {
-                position: surface_point,
+                // The main sphere keeps its original surface coordinates;
+                // the moon uses normalized local coordinates so its shader
+                // does not depend on its position in the scene.
+                position: if radius == 1.0 { surface_point } else { normal },
                 normal,
                 view_direction,
                 light_direction,
@@ -116,10 +137,10 @@ pub fn render_shader_with_saturn_rings(frame: &mut FrameBuffer, shader: &dyn Sha
     }
 }
 
-fn intersect_unit_sphere(ray: Ray) -> Option<(Vec3, Vec3)> {
-    let sphere_to_ray = ray.origin;
+fn intersect_sphere(ray: Ray, center: Vec3, radius: f32) -> Option<(Vec3, Vec3)> {
+    let sphere_to_ray = ray.origin - center;
     let b = sphere_to_ray.dot(ray.direction);
-    let c = sphere_to_ray.dot(sphere_to_ray) - 1.0;
+    let c = sphere_to_ray.dot(sphere_to_ray) - radius * radius;
     let discriminant = b * b - c;
 
     if discriminant < 0.0 {
@@ -132,7 +153,8 @@ fn intersect_unit_sphere(ray: Ray) -> Option<(Vec3, Vec3)> {
     }
 
     let surface_point = ray.origin + ray.direction * near_distance;
-    Some((surface_point, surface_point.normalized()))
+    let normal = (surface_point - center).normalized();
+    Some((surface_point, normal))
 }
 
 fn render_saturn_ring_at_pixel(frame: &mut FrameBuffer, x: usize, y: usize, ray: Ray) {
